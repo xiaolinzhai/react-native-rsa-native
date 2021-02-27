@@ -329,12 +329,13 @@ class RSAECNative: NSObject {
     public func encrypt(message: String) -> String? {
         guard let data =  message.data(using: .utf8) else { return nil }
         let encrypted = self._encrypt(data: data)
-        return encrypted?.base64EncodedString(options: .lineLength64Characters)
+        return "ffff";
+        //return encrypted?.base64EncodedString(options: .lineLength64Characters)
     }
     
     public func _encrypt(data: Data) -> Data? {
-        var cipherText: Data?
-        
+        //var cipherText: Data?
+        /*
         // Closures
         let encryptor:SecKeyPerformBlock = { publicKey in
             if #available(iOS 10.0, *) {
@@ -353,8 +354,51 @@ class RSAECNative: NSObject {
             self.performWithPublicKeyTag(tag: self.publicKeyTag!, block: encryptor)
         } else {
             encryptor(self.publicKey!);
-        }
-        return cipherText;
+        }*/
+        
+       let blockLen =  SecKeyGetBlockSize(self.publicSecKey!)
+       var outBuf = [UInt8](repeating: 0, count: blockLen)
+       var outBufLen:Int = blockLen
+       
+       var index = 0
+       let totalLen = data.length
+       
+       let resData = NSMutableData()
+       
+       var blockMaxLen = blockLen
+       
+       switch padding {
+       case SecPadding.PKCS1:
+           blockMaxLen = blockLen - 11
+           break
+       case SecPadding.OAEP:
+           blockMaxLen = blockLen - 42
+           break
+       default:
+           print("blockMaxLen == blockLen")
+       
+           break
+       }
+       
+       while index < totalLen {
+           var curDataLen = totalLen - index;
+           if curDataLen  > blockMaxLen {
+               curDataLen = blockMaxLen;
+           }
+           
+           let curData: NSData = (data.subdata(with: NSMakeRange(index, curDataLen)) as NSData)
+           
+           let status: OSStatus = SecKeyEncrypt(self.publicSecKey!, SecPadding.OAEP, curData.bytes.assumingMemoryBound(to: UInt8.self), curData.length, &outBuf, &outBufLen)
+           
+           if status == noErr {
+               resData.append(outBuf, length: outBufLen)
+           }else{
+               print("encrypt status = \(status)")
+           }
+           
+           index += curDataLen
+       }
+        return resData;
     }
     
     public func decrypt64(message: String) -> String? {
@@ -372,6 +416,33 @@ class RSAECNative: NSObject {
     
     private func _decrypt(data: Data) -> Data? {
         var clearText: Data?
+        
+        let blockSize = SecKeyGetBlockSize(self.privateKey!)
+        var encryptedDataAsArray = [UInt8](repeating: 0, count: data.count)
+        (data as NSData).getBytes(&encryptedDataAsArray, length: data.count)
+        
+        var decryptedDataBytes = [UInt8](repeating: 0, count: 0)
+        var idx = 0
+        while idx < encryptedDataAsArray.count {
+            
+            let idxEnd = min(idx + blockSize, encryptedDataAsArray.count)
+            let chunkData = [UInt8](encryptedDataAsArray[idx..<idxEnd])
+            
+            var decryptedDataBuffer = [UInt8](repeating: 0, count: blockSize)
+            var decryptedDataLength = blockSize
+            
+            let status = SecKeyDecrypt(self.privateKey!, .rsaEncryptionPKCS1, chunkData, idxEnd-idx, &decryptedDataBuffer, &decryptedDataLength)
+            /*guard status == noErr else {
+                throw SwiftyRSAError.chunkDecryptFailed(index: idx)
+            }*/
+            
+            decryptedDataBytes += [UInt8](decryptedDataBuffer[0..<decryptedDataLength])
+            
+            idx += blockSize
+        }
+        
+        let decryptedData = Data(bytes: decryptedDataBytes, count: decryptedDataBytes.count)
+        /*
         let decryptor: SecKeyPerformBlock = {privateKey in
             if #available(iOS 10.0, *) {
                 let canEncrypt = SecKeyIsAlgorithmSupported(privateKey, .decrypt, .rsaEncryptionPKCS1)
@@ -389,7 +460,7 @@ class RSAECNative: NSObject {
             self.performWithPrivateKeyTag(keyTag: self.privateKeyTag!, block: decryptor)
         } else {
             decryptor(self.privateKey!);
-        }
+        }*/
         return clearText
     }
     
