@@ -355,50 +355,37 @@ class RSAECNative: NSObject {
         } else {
             encryptor(self.publicKey!);
         }*/
-        
-       let blockLen =  SecKeyGetBlockSize(self.publicSecKey!)
-       var outBuf = [UInt8](repeating: 0, count: blockLen)
-       var outBufLen:Int = blockLen
-       
-       var index = 0
-       let totalLen = data.length
-       
-       let resData = NSMutableData()
-       
-       var blockMaxLen = blockLen
-       
-       switch padding {
-       case SecPadding.PKCS1:
-           blockMaxLen = blockLen - 11
-           break
-       case SecPadding.OAEP:
-           blockMaxLen = blockLen - 42
-           break
-       default:
-           print("blockMaxLen == blockLen")
-       
-           break
-       }
-       
-       while index < totalLen {
-           var curDataLen = totalLen - index;
-           if curDataLen  > blockMaxLen {
-               curDataLen = blockMaxLen;
-           }
-           
-           let curData: NSData = (data.subdata(with: NSMakeRange(index, curDataLen)) as NSData)
-           
-           let status: OSStatus = SecKeyEncrypt(self.publicSecKey!, SecPadding.OAEP, curData.bytes.assumingMemoryBound(to: UInt8.self), curData.length, &outBuf, &outBufLen)
-           
-           if status == noErr {
-               resData.append(outBuf, length: outBufLen)
-           }else{
-               print("encrypt status = \(status)")
-           }
-           
-           index += curDataLen
-       }
-        return resData;
+        let blockSize = SecKeyGetBlockSize(self.publicKey!)
+        var padding = SecPadding.PKCS1;
+        var maxChunkSize: Int
+        switch padding {
+        case []:
+           maxChunkSize = blockSize
+        case .OAEP:
+           maxChunkSize = blockSize - 42
+        default:
+           maxChunkSize = blockSize - 11
+        }
+
+        var decryptedDataAsArray = [UInt8](repeating: 0, count: data.count)
+        (data as NSData).getBytes(&decryptedDataAsArray, length: data.count)
+
+        var encryptedDataBytes = [UInt8](repeating: 0, count: 0)
+        var idx = 0
+        while idx < decryptedDataAsArray.count {
+
+           let idxEnd = min(idx + maxChunkSize, decryptedDataAsArray.count)
+           let chunkData = [UInt8](decryptedDataAsArray[idx..<idxEnd])
+           var encryptedDataBuffer = [UInt8](repeating: 0, count: blockSize)
+           var encryptedDataLength = blockSize
+
+        let status = SecKeyEncrypt(self.publicKey!, padding, chunkData, chunkData.count, &encryptedDataBuffer, &encryptedDataLength)
+           encryptedDataBytes += encryptedDataBuffer
+           idx += maxChunkSize
+        }
+
+        let encryptedData = Data(bytes: encryptedDataBytes, count: encryptedDataBytes.count)
+        return encryptedData;
     }
     
     public func decrypt64(message: String) -> String? {
