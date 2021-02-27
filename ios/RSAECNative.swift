@@ -415,7 +415,7 @@ class RSAECNative: NSObject {
     }
     
     private func _decrypt(data: Data) -> Data? {
-        var clearText: Data?
+      
         
         let blockSize = SecKeyGetBlockSize(self.privateKey!)
         var encryptedDataAsArray = [UInt8](repeating: 0, count: data.count)
@@ -461,7 +461,7 @@ class RSAECNative: NSObject {
         } else {
             decryptor(self.privateKey!);
         }*/
-        return clearText
+        return decryptedData
     }
     
     public func sign64(b64message: String, withAlgorithm: String) -> String? {
