@@ -418,7 +418,7 @@ class RSAECNative: NSObject {
             var decryptedDataBuffer = [UInt8](repeating: 0, count: blockSize)
             var decryptedDataLength = blockSize
             
-            let status = SecKeyDecrypt(self.privateKey!, .rsaEncryptionPKCS1, chunkData, idxEnd-idx, &decryptedDataBuffer, &decryptedDataLength)
+            let status = SecKeyDecrypt(self.privateKey!, SecPadding.PKCS1, chunkData, idxEnd-idx, &decryptedDataBuffer, &decryptedDataLength)
             /*guard status == noErr else {
                 throw SwiftyRSAError.chunkDecryptFailed(index: idx)
             }*/
@@ -429,25 +429,7 @@ class RSAECNative: NSObject {
         }
         
         let decryptedData = Data(bytes: decryptedDataBytes, count: decryptedDataBytes.count)
-        /*
-        let decryptor: SecKeyPerformBlock = {privateKey in
-            if #available(iOS 10.0, *) {
-                let canEncrypt = SecKeyIsAlgorithmSupported(privateKey, .decrypt, .rsaEncryptionPKCS1)
-                if(canEncrypt){
-                    var error: Unmanaged<CFError>?
-                    clearText = SecKeyCreateDecryptedData(privateKey, .rsaEncryptionPKCS1, data as CFData, &error) as Data?
-                }
-                
-            } else {
-                // Fallback on earlier versions
-            };
-        }
         
-        if ((self.keyTag) != nil) {
-            self.performWithPrivateKeyTag(keyTag: self.privateKeyTag!, block: decryptor)
-        } else {
-            decryptor(self.privateKey!);
-        }*/
         return decryptedData
     }
     
